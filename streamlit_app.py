@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import requests
 import datetime as dt
 from datetime import datetime
@@ -11,8 +12,6 @@ warnings.filterwarnings("ignore")
 
 # Declare my functions ------------------------------
 
-
-
 @st.cache_data(ttl='1h')
 def get_access_token(first_token, email):
     url = "https://app.circle.so/api/v1/headless/auth_token" 
@@ -22,7 +21,6 @@ def get_access_token(first_token, email):
     if response.status_code != 200:
         return 1 #a BAD EMAIL OR TOKEN
     return str("Bearer " + pd.json_normalize(response.json())['access_token'].iloc[0])
-
 
 # get space IDs (maybe later have an option to display these??)
 @st.cache_data(ttl='1h')
@@ -108,16 +106,16 @@ def pull_all_events(access_token):
 
     # Optional: Round the 'Length.Minutes' to a specific decimal place
     filt['Length_Minutes'] = filt['Length_Minutes'].round(1)
-    return filt[['Event_Title', 'Attendees', 'Author', 'Date', 'Likes', 'Comments', 'Lenth_Minutes', 'Space_Name']]
+    return filt[['Event_Title', 'Attendees', 'Author', 'Date', 'Likes', 'Comments', 'Length_Minutes', 'Space_Name']]
         
-
 def filter_events(df, weights, top_number=5):
     df['Worth'] = (df['Likes'] * weights['like']) + \
         (df['Comments'] * weights['comment']) + \
         (df['Attendees'] * weights['attendees']) + \
         (df['Length_Minutes'] * weights['duration'])
     df.sort_values(by="Worth", ascending=False, inplace=True)
-    return df[['Event_Title', 'Worth', 'Date', 'Attendees', 'Author_Name']].head(top_number)
+    return df[['Event_Title', 'Worth', 'Date', 'Attendees', 'Author']].head(top_number)
+
 
 def pull_most_valuable_people(df, top_number, weights, month=True, specific_month=None, 
                               specific_year=None, filter_admins=False, amount=0):
@@ -143,7 +141,7 @@ def pull_most_valuable_people(df, top_number, weights, month=True, specific_mont
 
     #check HERE if there is enough people to return the full number
     if len(user_worth_df) < top_number:
-        st.toast("There were not enough people who posted in this time period to fulfill your request. Please choose a different period or fewer people."}
+        st.toast("There were not enough people who posted in this time period to fulfill your request. Please choose a different period or fewer people.")
 
     shortened = user_worth_df.head(top_number)
     total_worth = shortened['Worth'].sum()
@@ -166,7 +164,6 @@ def pull_most_valuable_people(df, top_number, weights, month=True, specific_mont
         return df.head(top_number)
         
     return user_worth_df.head(top_number)
-
 
 def pull_most_valuable_posts(df, top_number, weights, month=0, specific_month=None, specific_year=None, filter_admins=False): #space_name="All",
     # maybe add that you can filter by a specific SPACE ---> would need to SHOW the space names somewhere...
@@ -218,7 +215,6 @@ st.set_page_config(
     page_icon=':sparkles:'
 )
 
-
 '''
 # Post and Person Valuation:
 This is an app for finding the most valuable posts and people in each community. It may take a couple minutes to pull all the posts from the API at the start.
@@ -230,7 +226,8 @@ You only need to create a Headless token once for each community because you can
 Make sure you remember what email/account you were using when you made the token because you will need that email below.
 '''
 
-st.link_button("See the Random Picker site for more instructions on generating tokens", "https://gigg-random-picker.streamlit.app/")
+
+# st.link_button("See the Random Picker site for more instructions on generating tokens", "https://gigg-random-picker.streamlit.app/")
 
 
 # Get the access key and choose People/Posts or Events --------------------------------
@@ -305,7 +302,7 @@ if top_five_events:
     else:
         events = pull_all_events(atoken)
         events.sort_values(by="Attendees", ascending=False, inplace=True)
-        st.dataframe(events[['Event_Title', 'Attendees', 'Date', 'Author_Name']]).head(5)
+        st.dataframe(events[['Event_Title', 'Attendees', 'Date', 'Author']]).head(5)
 
 
 
@@ -412,6 +409,13 @@ with st.form("pp_form"):
     
     
     filter_admins_check = st.checkbox("Filter out names containing: Admin", value = True)
+
+    #optional - choose an amount to assign money to
+    st.write("Optional When Filtering People:")
+    payment_amount = st.number_input(
+        label = "Input a dollar amount to see the distribution between top members", 
+        min_value=0, max_value=10000, value="min"
+    )
     
     
     
@@ -427,7 +431,7 @@ with st.form("pp_form"):
             members = pull_all_posts(atoken)
             try:
                 if post_or_people_selection == 0: #PEOPLE
-                    st.dataframe(pull_most_valuable_people(members, top_number=picks, weights = weights, month=time_selection, filter_admins=filter_admins_check))
+                    st.dataframe(pull_most_valuable_people(members, top_number=picks, weights = weights, month=time_selection, filter_admins=filter_admins_check, amount = payment_amount))
                 elif post_or_people_selection == 1: #POSTS
                     st.dataframe(pull_most_valuable_posts(members, top_number=picks, weights = weights, month=time_selection, filter_admins=filter_admins_check))
             except ValueError as e:
