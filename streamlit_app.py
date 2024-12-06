@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
-import datetime as dt
+# import datetime as dt
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from datetime import datetime
 import time
 import warnings
@@ -35,7 +37,7 @@ def get_space_ids(access_token):
 @st.cache_data(ttl='1h')
 def pull_all_posts(access_token):
     space_id_df = get_space_ids(access_token)
-    master_list = pd.DataFrame(columns=['post_type', 'space_type', 'display_title', 'comment_count', 'user_likes_count', 'created_at', 'author.name', 'space.name'])
+    master_list = pd.DataFrame(columns=['post_type', 'space_type', 'display_title', 'comment_count', 'user_likes_count', 'created_at', 'author.name', 'space.name', 'author.roles'])
     for space_id in space_id_df['id']:
         base_url = f"https://app.circle.so/api/headless/v1/spaces/{space_id}/posts?sort=latest&per_page=100&page="
         headers = {'Authorization': access_token}
@@ -51,7 +53,7 @@ def pull_all_posts(access_token):
             df = pd.json_normalize(records)
             df = df[[
                 'post_type', 'display_title', 'comment_count', 'user_likes_count', 
-                'created_at', 'author.name', 'space.name'
+                'created_at', 'author.name', 'space.name', 'author.roles'
             ]]
             df_all = pd.concat([df_all, df], ignore_index=True)
             if not data.get("has_next_page", False):
@@ -70,10 +72,11 @@ def pull_all_posts(access_token):
         'user_likes_count': 'Likes',
         'created_at': 'Date',
         'space.name': 'Space_Name',
-        'post_type': 'Post_Type'
+        'post_type': 'Post_Type',
+        'author.roles': 'Author_Roles'
     })
     master_list.sort_values(by='Date', ascending=False, inplace=True)
-    return master_list[['Title', 'Author', 'Date', 'Likes', 'Comments', 'Post_Type', 'Space_Name']]
+    return master_list[['Title', 'Author', 'Date', 'Likes', 'Comments', 'Post_Type', 'Space_Name', 'Author_Roles']]
 
 @st.cache_data(ttl='1h')
 def pull_all_events(access_token):
@@ -85,7 +88,7 @@ def pull_all_events(access_token):
     event_df = pd.json_normalize(records)
     event_df = event_df[~event_df['space.name'].str.contains('Moderator Training Space', na=False)]
     filt = event_df[['name','event_attendees.count', 'created_at', 'comment_count', 'user_likes_count',  
-      'author.name', 'event_setting_attributes.duration_in_seconds', 'space.name' ]]
+      'author.name', 'event_setting_attributes.duration_in_seconds', 'space.name', 'author.roles']]
 
     filt = filt.rename(columns={
         'name': 'Event_Title',
@@ -95,7 +98,8 @@ def pull_all_events(access_token):
         'user_likes_count': 'Likes',
         'author.name': 'Author',
         'event_setting_attributes.duration_in_seconds': 'Length_Minutes',
-        'space.name': 'Space_Name'
+        'space.name': 'Space_Name',
+        'author.roles':'Author_Roles'
     })
 
     # Format the 'Date' column to show only 'YYYY-MM-DD'
@@ -106,7 +110,7 @@ def pull_all_events(access_token):
 
     # Optional: Round the 'Length.Minutes' to a specific decimal place
     filt['Length_Minutes'] = filt['Length_Minutes'].round(1)
-    return filt[['Event_Title', 'Attendees', 'Author', 'Date', 'Likes', 'Comments', 'Length_Minutes', 'Space_Name']]
+    return filt[['Event_Title', 'Attendees', 'Author', 'Date', 'Likes', 'Comments', 'Length_Minutes', 'Space_Name', 'Author_Roles']]
         
 def filter_events(df, weights, top_number=5):
     df['Worth'] = (df['Likes'] * weights['like']) + \
@@ -114,21 +118,40 @@ def filter_events(df, weights, top_number=5):
         (df['Attendees'] * weights['attendees']) + \
         (df['Length_Minutes'] * weights['duration'])
     df.sort_values(by="Worth", ascending=False, inplace=True)
-    return df[['Event_Title', 'Worth', 'Date', 'Attendees', 'Author']].head(top_number)
+    return df[['Event_Title', 'Worth', 'Date', 'Attendees', 'Author', 'Author_Roles']].head(top_number)
 
 
-def pull_most_valuable_people(df, top_number, weights, month=True, specific_month=None, 
-                              specific_year=None, filter_admins=False, amount=0):
+def pull_most_valuable_people(df, top_number, weights, month=True, specific_date='', 
+                              filter_admins=False, filter_mods=False, amount=0):
     if filter_admins:
+        df = df[~df['Author_Roles'].apply(lambda x: 'admin' in x)]
         df = df[~df['Author'].str.contains('admin', case=False, na=False)]
+    
+    if filter_mods:
+        df = df[~df['Author_Roles'].apply(lambda x: 'moderator' in x)]
+
 
     # MONTH STUFF
-    if month == 1:
-        current_year = datetime.now().year
-        current_month = datetime.now().month
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+
+    #if 0, then for ALL TIME
+    if month == 1: # for current month
         df = df.loc[(df['Date'].dt.year == current_year) & (df['Date'].dt.month == current_month)]
-    # elif month == 2:
-    #     df = df.loc[(df['Date'].dt.year == specific_year) & (df['Date'].dt.month == specific_month)]
+    elif month == 2:# for LAST MONTH
+        last_month_date = datetime.now() - relativedelta(months=1)
+        last_month_year = last_month_date.year
+        last_month = last_month_date.month
+        df = df.loc[(df['Date'].dt.year == last_month_year) & (df['Date'].dt.month == last_month)]
+    elif month == 3: #for a specific date
+        specific_date = datetime.strptime(str(specific_date), '%Y-%m-%d')
+        if specific_date > datetime.now() and specific_date.month != datetime.now().month:
+            st.toast("Please choose a date in the PAST, not the future.")
+        df = df.loc[(df['Date'].dt.year == specific_date.year) & (df['Date'].dt.month == specific_date.month)]
+    # elif month == 4: for a different time range?
+
+
+
 
 
     df['post_type_weight'] = df['Post_Type'].map(weights)
@@ -137,6 +160,7 @@ def pull_most_valuable_people(df, top_number, weights, month=True, specific_mont
                      (df['post_type_weight'] * 10)
 
     user_worth_df = df.groupby('Author', as_index=False).agg({'Worth': 'sum'})
+    # user_worth_df = df.groupby(['Author', ''], as_index=False).agg({'Worth': 'sum'})
     user_worth_df.sort_values(by='Worth', ascending=False, inplace=True)
 
     #check HERE if there is enough people to return the full number
@@ -165,26 +189,42 @@ def pull_most_valuable_people(df, top_number, weights, month=True, specific_mont
         
     return user_worth_df.head(top_number)
 
-def pull_most_valuable_posts(df, top_number, weights, month=0, specific_month=None, specific_year=None, filter_admins=False): #space_name="All",
+def pull_most_valuable_posts(df, top_number, weights, month=0, specific_date='',
+                              filter_admins=False, filter_mods=False): #space_name="All",
     # maybe add that you can filter by a specific SPACE ---> would need to SHOW the space names somewhere...
     #like have a dropdown of all the space names...? might lead to more problems idk
     # if month == 0: # do nothing
 
     if filter_admins:
+        df = df[~df['Author_Roles'].apply(lambda x: 'admin' in x)]
         df = df[~df['Author'].str.contains('admin', case=False, na=False)]
+    
+    if filter_mods:
+        df = df[~df['Author_Roles'].apply(lambda x: 'moderator' in x)]
 
-    if month == 1:
-        current_year = datetime.now().year
-        current_month = datetime.now().month
+    # MONTH STUFF
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+
+    #if 0, then for ALL TIME
+    if month == 1: # for current month
         df = df.loc[(df['Date'].dt.year == current_year) & (df['Date'].dt.month == current_month)]
-    # elif month == 2:
-    #     df = df.loc[(df['Date'].dt.year == specific_year) & (df['Date'].dt.month == specific_month)]
+    elif month == 2:# for LAST MONTH
+        last_month_date = datetime.now() - relativedelta(months=1)
+        last_month_year = last_month_date.year
+        last_month = last_month_date.month
+        df = df.loc[(df['Date'].dt.year == last_month_year) & (df['Date'].dt.month == last_month)]
+    elif month == 3: #for a specific date
+        specific_date = datetime.strptime(str(specific_date), '%Y-%m-%d')
+        if specific_date > datetime.now() and specific_date.month != datetime.now().month:
+            st.toast("Please choose a date in the PAST, not the future.")
+        df = df.loc[(df['Date'].dt.year == specific_date.year) & (df['Date'].dt.month == specific_date.month)]
 
 
         #after filtering to the right dates, now check how many posts there are --- if not enough, send a TOAST up and return early
     #ACTUALLY THIS IS FOR THE POSTS, NOT THE PEOPLE PULLER
-    # if len(df) < top_number:
-    #     st.toast(f"There are only {len(df)} posts from that time period. Please choose a different period or fewer posts.")
+    if len(df) < top_number:
+        st.toast(f"There are only {len(df)} posts from that time period. Please choose a different period or fewer posts.")
     
     df['post_type_weight'] = df['Post_Type'].map(weights)
     df['Worth'] = (df['Likes'] * weights['like']) + \
@@ -227,7 +267,7 @@ Make sure you remember what email/account you were using when you made the token
 '''
 
 
-# st.link_button("See the Random Picker site for more instructions on generating tokens", "https://gigg-random-picker.streamlit.app/")
+st.link_button("See the Random Picker site for more instructions on generating tokens", "https://gigg-random-picker.streamlit.app/")
 
 
 # Get the access key and choose People/Posts or Events --------------------------------
@@ -256,7 +296,12 @@ else:
 
 st.divider()
 st.subheader("Quick Buttons:")
-'''Get the top five values in different categories for the community with admins removed and default weights.'''
+'''Get the top five values in different categories for the community with admins/moderators removed and default weights.
+Like = 1
+Comment = 2
+Basic Post Type = 1
+Image Post Type = 2
+'''
 
 
 top_five_this_month = st.button("5 most valuable posts this month so far")
@@ -272,7 +317,7 @@ if top_five_this_month:
                 'basic': 1,
                 'image': 2
             }
-            st.dataframe(pull_most_valuable_posts(members, top_number=5, weights = weights, month=1, filter_admins=True))
+            st.dataframe(pull_most_valuable_posts(members, top_number=5, weights = weights, month=1, filter_admins=True, filter_mods=True))
         except ValueError as e:
             st.error(f"There are not 5 members that fit these parameters. Please try a smaller number or choose different filters. ")
 
@@ -290,7 +335,7 @@ if top_five_all_time:
                 'basic': 1,
                 'image': 2
             }
-            st.dataframe(pull_most_valuable_people(members, top_number=5, weights = weights, month=0, filter_admins=True))
+            st.dataframe(pull_most_valuable_people(members, top_number=5, weights = weights, month=0, filter_admins=True, filter_mods=True))
         except ValueError as e:
             st.error(f"There are not 5 members that fit these parameters. Please try a smaller number or choose different filters. ")
 
@@ -302,7 +347,7 @@ if top_five_events:
     else:
         events = pull_all_events(atoken)
         events.sort_values(by="Attendees", ascending=False, inplace=True)
-        st.dataframe(events[['Event_Title', 'Attendees', 'Date', 'Author']]).head(5)
+        st.dataframe(events[['Event_Title', 'Attendees', 'Date', 'Author']].head(5))
 
 
 
@@ -391,8 +436,9 @@ with st.form("pp_form"):
     time_option_map = {
         0: "All Time",
         1: "This Month",
-        2: "Other Specific Month",
-        # 3: "Other Time Range"
+        2: "Last Month",
+        3: "Other Specific Month",
+        # 4: "Other Time Range"
     }
     time_selection = st.segmented_control(
         "Choose what to pull: ",
@@ -407,8 +453,13 @@ with st.form("pp_form"):
                     # )
                     # year_pick = st.number_input("Year", 2024, 2025)
     
+    st.write("If you want a specific month, choose any day in that month.")
+    opt_date = st.date_input("Choose a month", value=None)
+
     
-    filter_admins_check = st.checkbox("Filter out names containing: Admin", value = True)
+    filter_admins_check = st.checkbox("Filter out Admins", value = True)
+    filter_mods_check = st.checkbox("Filter out Moderators", value = True)
+
 
     #optional - choose an amount to assign money to
     st.write("Optional When Filtering People:")
@@ -416,9 +467,6 @@ with st.form("pp_form"):
         label = "Input a dollar amount to see the distribution between top members", 
         min_value=0, max_value=10000, value="min"
     )
-    
-    
-    
     
     
     p_submit = st.form_submit_button('Submit my picks')
@@ -431,9 +479,9 @@ with st.form("pp_form"):
             members = pull_all_posts(atoken)
             try:
                 if post_or_people_selection == 0: #PEOPLE
-                    st.dataframe(pull_most_valuable_people(members, top_number=picks, weights = weights, month=time_selection, filter_admins=filter_admins_check, amount = payment_amount))
+                    st.dataframe(pull_most_valuable_people(members, top_number=picks, weights = weights, month=time_selection, specific_date=opt_date, filter_admins=filter_admins_check, filter_mods=filter_mods_check, amount = payment_amount))
                 elif post_or_people_selection == 1: #POSTS
-                    st.dataframe(pull_most_valuable_posts(members, top_number=picks, weights = weights, month=time_selection, filter_admins=filter_admins_check))
+                    st.dataframe(pull_most_valuable_posts(members, top_number=picks, weights = weights, month=time_selection, specific_date=opt_date, filter_admins=filter_admins_check, filter_mods=filter_mods_check))
             except ValueError as e:
                 st.error(f"There are not {picks} members that fit these parameters. Please try a smaller number or choose different filters. ")
 
@@ -465,3 +513,23 @@ if stats_button:
     st.write(f"The total number of livestream events is {len(events)} events.")
     st.write(f"The person with the most posts is {highest_poster} with {most_posts_count} posts.")
     st.write(f"The total number of community members with at least one post is {len(post_counts)}.")
+
+
+
+next_month = datetime.now() + relativedelta(months=1)
+
+
+with st.form("this form"):
+    start_time = st.slider(
+        "When do you start?",
+        value=datetime(2024, 6, 1),
+        min_value=datetime(2024,1,1),
+        # max_value=datetime(2025,6,1),
+        # max_value=next_month,
+        format="MM/YY"
+    )
+    push = st.form_submit_button("HERE")
+if push:
+    st.write(start_time)
+
+
