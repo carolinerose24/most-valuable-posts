@@ -6,8 +6,6 @@ import requests
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import matplotlib.pyplot as plt
-
-# from datetime import datetime
 import time
 import warnings
 warnings.filterwarnings("ignore")
@@ -39,7 +37,9 @@ def get_space_ids(access_token):
 @st.cache_data(ttl='1h')
 def pull_all_posts(access_token):
     space_id_df = get_space_ids(access_token)
-    master_list = pd.DataFrame(columns=['post_type', 'space_type', 'display_title', 'comment_count', 'user_likes_count', 'created_at', 'author.name', 'space.name', 'author.roles'])
+    master_list = pd.DataFrame(columns=['post_type', 'space_type', 'display_title', 'comment_count', 
+                                        'user_likes_count', 'created_at', 'author.name', 'space.name', 
+                                        'author.roles', 'author.id', 'id'])
     for space_id in space_id_df['id']:
         base_url = f"https://app.circle.so/api/headless/v1/spaces/{space_id}/posts?sort=latest&per_page=100&page="
         headers = {'Authorization': access_token}
@@ -55,7 +55,7 @@ def pull_all_posts(access_token):
             df = pd.json_normalize(records)
             df = df[[
                 'post_type', 'display_title', 'comment_count', 'user_likes_count', 
-                'created_at', 'author.name', 'space.name', 'author.roles'
+                'created_at', 'author.name', 'space.name', 'author.roles', 'author.id', 'id'
             ]]
             df_all = pd.concat([df_all, df], ignore_index=True)
             if not data.get("has_next_page", False):
@@ -75,10 +75,14 @@ def pull_all_posts(access_token):
         'created_at': 'Date',
         'space.name': 'Space_Name',
         'post_type': 'Post_Type',
-        'author.roles': 'Author_Roles'
+        'author.roles': 'Author_Roles',
+        'author.id':'Author_ID',
+        'id':'Post_ID'
     })
     master_list.sort_values(by='Date', ascending=False, inplace=True)
-    return master_list[['Title', 'Author', 'Date', 'Likes', 'Comments', 'Post_Type', 'Space_Name', 'Author_Roles']]
+    master_list['Post_ID'] = master_list['Post_ID'].astype('Int64')  # 'Int64' handles NaN values as well
+    master_list['Author_ID'] = master_list['Author_ID'].astype('Int64')
+    return master_list[['Title', 'Author', 'Date', 'Likes', 'Comments', 'Post_Type', 'Space_Name', 'Author_Roles', 'Author_ID', 'Post_ID']]
 
 @st.cache_data(ttl='1h')
 def pull_all_events(access_token):
@@ -90,7 +94,8 @@ def pull_all_events(access_token):
     event_df = pd.json_normalize(records)
     event_df = event_df[~event_df['space.name'].str.contains('Moderator Training Space', na=False)]
     filt = event_df[['name','event_attendees.count', 'created_at', 'comment_count', 'user_likes_count',  
-      'author.name', 'event_setting_attributes.duration_in_seconds', 'space.name', 'author.roles']]
+      'author.name', 'event_setting_attributes.duration_in_seconds', 'space.name', 'author.roles',
+      'id', 'author.id']]
 
     filt = filt.rename(columns={
         'name': 'Event_Title',
@@ -101,7 +106,9 @@ def pull_all_events(access_token):
         'author.name': 'Author',
         'event_setting_attributes.duration_in_seconds': 'Length_Minutes',
         'space.name': 'Space_Name',
-        'author.roles':'Author_Roles'
+        'author.roles':'Author_Roles',
+        'author.id': 'Author_ID',
+        'id':'Post_ID'
     })
 
     # Format the 'Date' column to show only 'YYYY-MM-DD'
@@ -112,7 +119,9 @@ def pull_all_events(access_token):
 
     # Optional: Round the 'Length.Minutes' to a specific decimal place
     filt['Length_Minutes'] = filt['Length_Minutes'].round(1)
-    return filt[['Event_Title', 'Attendees', 'Author', 'Date', 'Likes', 'Comments', 'Length_Minutes', 'Space_Name', 'Author_Roles']]
+    filt['Post_ID'] = filt['Post_ID'].astype('Int64')  # 'Int64' handles NaN values as well
+    filt['Author_ID'] = filt['Author_ID'].astype('Int64')
+    return filt[['Event_Title', 'Attendees', 'Author', 'Date', 'Likes', 'Comments', 'Length_Minutes', 'Space_Name', 'Author_Roles', 'Author_ID', 'Post_ID']]
         
 def filter_events(df, weights, top_number=5):
     df['Worth'] = (df['Likes'] * weights['like']) + \
@@ -161,8 +170,8 @@ def pull_most_valuable_people(df, top_number, weights, month=True, specific_date
                      (df['Comments'] * weights['comment']) + \
                      (df['post_type_weight'] * 10)
 
-    user_worth_df = df.groupby('Author', as_index=False).agg({'Worth': 'sum'})
-    # user_worth_df = df.groupby(['Author', ''], as_index=False).agg({'Worth': 'sum'})
+    # user_worth_df = df.groupby('Author', as_index=False).agg({'Worth': 'sum'})
+    user_worth_df = df.groupby(['Author', 'Author_ID'], as_index=False).agg({'Worth': 'sum'})
     user_worth_df.sort_values(by='Worth', ascending=False, inplace=True)
 
     #check HERE if there is enough people to return the full number
@@ -239,7 +248,7 @@ def pull_most_valuable_posts(df, top_number, weights, month=0, specific_date='',
     shortened.loc[:, 'Worth_Percentage'] = (shortened['Worth'] / total_worth * 100)
     shortened = shortened.reset_index(drop=True)
     shortened['Date'] = pd.to_datetime(shortened['Date']).dt.strftime('%Y-%m-%d')
-    return shortened[['Title', 'Author', 'Worth', 'Worth_Percentage', 'Comments', 'Likes', 'Date']]
+    return shortened[['Title', 'Author', 'Worth', 'Worth_Percentage', 'Comments', 'Likes', 'Date', 'Post_ID']]
 
     # month == 0 --> don't filter anything
     # month == 1 --> filter to this current month so far
@@ -250,24 +259,14 @@ def pull_most_valuable_posts(df, top_number, weights, month=0, specific_date='',
 
 def plot_events(df):
 
-    # Sort events by Date in descending order to have the newest first
+    df['Date'] = pd.to_datetime(events['Date'])
     recent_events = df.sort_values(by='Date', ascending=False)
-
-    # Select the 10 most recent events (or fewer if less than 10 exist)
-    top_10_events = recent_events.head(10).sort_values(by='Date', ascending=True)  # Re-sort to show oldest to newest
-
-    # Extract x (Dates) and y (Attendees) values
+    top_10_events = recent_events.head(10).sort_values(by='Date', ascending=True)
     x = top_10_events['Date'].dt.strftime('%Y-%m-%d')
     y = top_10_events['Attendees']
-
-    # Plot the bar chart
     plt.figure(figsize=(10, 6))
     bars = plt.bar(x, y, color='#D0BA71', label='Attendees')
-
-    # Overlay a line plot
     # plt.plot(x, y, color='red', marker='o', linestyle='-', linewidth=2, label='Trend Line')
-
-    # Add value labels on top of the bars
     for bar in bars:
         height = bar.get_height()
         plt.text(
@@ -280,12 +279,38 @@ def plot_events(df):
             color='black'
         )
 
-    # Add chart labels and formatting
-    plt.title(f'Number of Attendees for the {len(top_10_events)} Most Recent Events')
+    plt.title(f'Number of Attendees for the {len(top_10_events)} Most Recent Events', fontsize=18)
     plt.xlabel('Event Date')
     plt.ylabel('Number of Attendees')
     plt.xticks(rotation=45, ha="right")
-    plt.legend()
+    # plt.legend()
+    plt.tight_layout()
+    st.pyplot(plt)
+
+
+def plot_post_type(df):
+    post_type_counts = df['Post_Type'].value_counts()
+    plt.figure(figsize=(7, 7))
+    plt.pie(post_type_counts, labels=post_type_counts.index, autopct='%1.1f%%', colors=['#D0BA71', '#E8E8E8'], startangle=90)
+    plt.title('Distribution of Post Types')
+    st.pyplot(plt)
+
+
+def plot_posts_per_day(df):
+    df['Date'] = pd.to_datetime(df['Date'])
+    df['Year_Month'] = df['Date'].dt.to_period('M')
+    posts_per_month_day = df.groupby(df['Year_Month']).apply(lambda x: x['Date'].dt.date.nunique())
+    posts_per_month = df.groupby('Year_Month').size()
+    avg_posts_per_day_by_month = posts_per_month / posts_per_month_day
+    avg_posts_per_day_by_month = avg_posts_per_day_by_month.sort_index()
+    plt.figure(figsize=(10, 6))
+    avg_posts_per_day_by_month.plot(kind='bar', color='#D0BA71')
+    plt.title('Average Number of Posts Per Day by Month', fontsize=18)
+    plt.xlabel('Month')
+    plt.ylabel('Average Posts per Day')
+    plt.xticks(rotation=45, ha='right')
+    for i, v in enumerate(avg_posts_per_day_by_month):
+        plt.text(i, v + 0.05, f'{v:.2f}', ha='center', va='bottom', fontsize=9)
     plt.tight_layout()
     st.pyplot(plt)
 
@@ -338,7 +363,7 @@ if first_token != "" and email != "":
     if atoken == 1:
         st.error('Bad token or email, please try again')
     else:
-        st.write(":white_check_mark: Good token and email, now we are ready to pull data from the APIs. Notice that the first time the posts are pulling may take a couple minutes.")
+        st.write(":white_check_mark: Good token and email, now we are ready to pull data from the APIs. Notice that the first time the posts are pulled may take a couple minutes.")
         st.write("Because Circle does not allow us to see the hosts/cohosts of livestream events at this time, we cannot assign worth to a person for livestream events the same as we can image or text posts. Consequently, they must be viewed seperately right now.")
 
 
@@ -353,10 +378,10 @@ else:
 st.divider()
 st.subheader("Quick Buttons:")
 '''Get the top five values in different categories for the community with admins/moderators removed and default weights.
-Like = 1
-Comment = 2
-Basic Post Type = 1
-Image Post Type = 2
+- Like = 1
+- Comment = 2
+- Basic Post Type = 1
+- Image Post Type = 2
 '''
 
 
@@ -488,7 +513,7 @@ with st.form("pp_form"):
     }
 
     #Radio button to do a current month, a specific month/year, or a range...
-    st.write("What time range do you want to pull posts from")
+    st.write("What time range do you want to pull posts from?")
     time_option_map = {
         0: "All Time",
         1: "This Month",
@@ -544,10 +569,10 @@ with st.form("pp_form"):
 
 
 st.divider()
-"""Future features if circle ever gets back to us
-- events where we know who hosted/cohosted
-- filter by activity score
-- OR SOMETHING THAT LETS YOU GET THE EMAIL/OTHER INFO ON A PERSON IF THEY PASTE IN THEIR NAME OR SOMETHING
+"""Possible Future features (depending on if circle ever gets back to us):
+- Events where we know the names of who hosted/cohosted (not available anywhere)
+- Filter by activity score (not available in headless)
+- Input tokens from multiple communities at a time
 """
 
 
@@ -557,22 +582,36 @@ st.divider()
 
 # #PAGE TWO
 
-stats_button = st.button("Generate some statisitics about this data: ")
+stats_button = st.button("Generate some statisitics/graphs about this data: ")
 if stats_button:
-    posts = pull_all_posts(atoken)
-    post_counts = posts['author.name'].value_counts()
-    highest_poster = post_counts.index[0]
-    most_posts_count = post_counts.iloc[0]
+    if atoken == 0 or atoken == 1:
+            st.toast("Can't pull the posts with a bad token")
+    else:
+        posts = pull_all_posts(atoken)
+        post_counts = posts['Author'].value_counts()
+        highest_poster = post_counts.index[0]
+        most_posts_count = post_counts.iloc[0]
 
-    events = pull_all_events(atoken)
-    st.write(f"The total number of posts made in this community is {len(posts)} posts.")
-    st.write(f"The total number of livestream events is {len(events)} events.")
-    st.write(f"The person with the most posts is {highest_poster} with {most_posts_count} posts.")
-    st.write(f"The total number of community members with at least one post is {len(post_counts)}.")
+        space_counts = posts['Space_Name'].value_counts()
+        biggest_space = space_counts.index[0]
+        biggest_space_count = space_counts.iloc[0]
+
+        events = pull_all_events(atoken)
+        st.write(f"The total number of posts made in this community is {len(posts)} posts.")
+        st.write(f"There have been {len(events)} events.")
+        st.write(f"The person with the most posts is {highest_poster} with {most_posts_count} posts.")
+        st.write(f"The total number of community members with at least one post is {len(post_counts)}.")
+        st.write(f"The space with the most posts is \"{biggest_space}\" with {biggest_space_count} posts.")
 
 
 
-    #start with the graphs:
+        plot_events(events)
+        plot_post_type(posts)
+        plot_posts_per_day(posts)
+        
+
+
+
 
 
 
@@ -591,10 +630,3 @@ if stats_button:
 # if push:
 #     st.write(start_time)
 
-
-import matplotlib.pyplot as plt
-import numpy as np
-arr = np.random.normal(1, 1, size=100)
-fig, ax = plt.subplots()
-ax.hist(arr, bins=20)
-st.pyplot(fig)
