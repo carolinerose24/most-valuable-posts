@@ -332,8 +332,8 @@ def plot_posts_per_day(df):
     plt.figure(figsize=(10, 6))
     avg_posts_per_day_by_month.plot(kind='bar', color='#D0BA71')
     plt.title('Average Number of Posts Per Day by Month', fontsize=18)
-    plt.xlabel('Month', fontsize=12)
-    plt.ylabel('Average Posts per Day', fontsize=12)
+    plt.xlabel('Month', fontsize=14)
+    plt.ylabel('Average Posts per Day', fontsize=14)
     plt.xticks(rotation=45, ha='right')
     for i, v in enumerate(avg_posts_per_day_by_month):
         plt.text(i, v + 0.05, f'{v:.2f}', ha='center', va='bottom', fontsize=10)
@@ -372,8 +372,8 @@ def plot_likes_comments_per_day(df):
     
     # Titles and labels
     plt.title('Average Likes and Comments Per Day by Month', fontsize=18)
-    plt.xlabel('Month', fontsize=12)
-    plt.ylabel('Average Per Day', fontsize=12)
+    plt.xlabel('Month', fontsize=14)
+    plt.ylabel('Average Per Day', fontsize=14)
     plt.xticks(rotation=45, ha='right')
     plt.legend(fontsize=14)
 
@@ -388,42 +388,42 @@ def plot_likes_comments_per_day(df):
     st.pyplot(plt)
 
 
-def plot_high_likes_and_comments(df):
+# def plot_high_likes_and_comments(df):
 
 
-    # Group by 'Space_Name' and calculate the average of 'Likes' and 'Comments'
-    average_likes_comments = df.groupby('Space_Name')[['Likes', 'Comments']].mean()
+#     # Group by 'Space_Name' and calculate the average of 'Likes' and 'Comments'
+#     average_likes_comments = df.groupby('Space_Name')[['Likes', 'Comments']].mean()
 
-    # Sort by 'Comments' in descending order to get the spaces with the highest average comments
-    top_5_spaces_comments = average_likes_comments.sort_values(by='Comments', ascending=False).head(5)
-    top_5_spaces_likes = average_likes_comments.sort_values(by='Likes', ascending=False).head(5)
+#     # Sort by 'Comments' in descending order to get the spaces with the highest average comments
+#     top_5_spaces_comments = average_likes_comments.sort_values(by='Comments', ascending=False).head(5)
+#     top_5_spaces_likes = average_likes_comments.sort_values(by='Likes', ascending=False).head(5)
 
-    # Create the figure and axes for two subplots (side by side)
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+#     # Create the figure and axes for two subplots (side by side)
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
-    # Plot for Likes
-    top_5_spaces_likes['Likes'].plot(kind='bar', ax=ax1, color='#D0BA71', width=0.8)
-    ax1.set_title('Top 5 Spaces with Highest Average Likes', fontsize=14)
-    ax1.set_xlabel('Space Name', fontsize=12)
-    ax1.set_ylabel('Average Likes', fontsize=12)
-    ax1.set_xticklabels(top_5_spaces_likes.index, rotation=45, ha="right")
-    ax1.legend(['Likes'], loc='upper right')
-    for container in ax1.containers:
-        ax1.bar_label(container, label_type='edge', padding=3, fontsize=10)
+#     # Plot for Likes
+#     top_5_spaces_likes['Likes'].plot(kind='bar', ax=ax1, color='#D0BA71', width=0.8)
+#     ax1.set_title('Top 5 Spaces with Highest Average Likes', fontsize=14)
+#     ax1.set_xlabel('Space Name', fontsize=12)
+#     ax1.set_ylabel('Average Likes', fontsize=12)
+#     ax1.set_xticklabels(top_5_spaces_likes.index, rotation=45, ha="right")
+#     ax1.legend(['Likes'], loc='upper right')
+#     for container in ax1.containers:
+#         ax1.bar_label(container, label_type='edge', padding=3, fontsize=10)
 
-    # Plot for Comments
-    top_5_spaces_comments['Comments'].plot(kind='bar', ax=ax2, color='#E8E8E8', width=0.8)
-    ax2.set_title('Top 5 Spaces with Highest Average Comments', fontsize=14)
-    ax2.set_xlabel('Space Name', fontsize=12)
-    ax2.set_ylabel('Average Comments', fontsize=12)
-    ax2.set_xticklabels(top_5_spaces_comments.index, rotation=45, ha="right")
-    ax2.legend(['Comments'], loc='upper right')
-    for container in ax2.containers:
-        ax2.bar_label(container, label_type='edge', padding=3, fontsize=10)
+#     # Plot for Comments
+#     top_5_spaces_comments['Comments'].plot(kind='bar', ax=ax2, color='#E8E8E8', width=0.8)
+#     ax2.set_title('Top 5 Spaces with Highest Average Comments', fontsize=14)
+#     ax2.set_xlabel('Space Name', fontsize=12)
+#     ax2.set_ylabel('Average Comments', fontsize=12)
+#     ax2.set_xticklabels(top_5_spaces_comments.index, rotation=45, ha="right")
+#     ax2.legend(['Comments'], loc='upper right')
+#     for container in ax2.containers:
+#         ax2.bar_label(container, label_type='edge', padding=3, fontsize=10)
 
-    # Adjust the layout and show the plot
-    plt.tight_layout()
-    st.pyplot(plt)
+#     # Adjust the layout and show the plot
+#     plt.tight_layout()
+#     st.pyplot(plt)
 
 
 
