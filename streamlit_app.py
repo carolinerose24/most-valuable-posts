@@ -5,7 +5,9 @@ import requests
 # import datetime as dt
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from datetime import datetime
+import matplotlib.pyplot as plt
+
+# from datetime import datetime
 import time
 import warnings
 warnings.filterwarnings("ignore")
@@ -243,6 +245,60 @@ def pull_most_valuable_posts(df, top_number, weights, month=0, specific_date='',
     # month == 1 --> filter to this current month so far
     # month == 2 XX other specific month, get the others working first
     # month == 3 XX other range,,,,,,,
+
+
+
+def plot_events(df):
+
+    # Sort events by Date in descending order to have the newest first
+    recent_events = df.sort_values(by='Date', ascending=False)
+
+    # Select the 10 most recent events (or fewer if less than 10 exist)
+    top_10_events = recent_events.head(10).sort_values(by='Date', ascending=True)  # Re-sort to show oldest to newest
+
+    # Extract x (Dates) and y (Attendees) values
+    x = top_10_events['Date'].dt.strftime('%Y-%m-%d')
+    y = top_10_events['Attendees']
+
+    # Plot the bar chart
+    plt.figure(figsize=(10, 6))
+    bars = plt.bar(x, y, color='#D0BA71', label='Attendees')
+
+    # Overlay a line plot
+    # plt.plot(x, y, color='red', marker='o', linestyle='-', linewidth=2, label='Trend Line')
+
+    # Add value labels on top of the bars
+    for bar in bars:
+        height = bar.get_height()
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,  # X-coordinate: Center of the bar
+            height + 50,  # Y-coordinate: Slightly above the bar
+            f'{int(height)}',  # Text to display (convert height to integer)
+            ha='center',  # Center-align the text
+            va='bottom',  # Bottom of the text aligns with the Y-coordinate
+            fontsize=9,
+            color='black'
+        )
+
+    # Add chart labels and formatting
+    plt.title(f'Number of Attendees for the {len(top_10_events)} Most Recent Events')
+    plt.xlabel('Event Date')
+    plt.ylabel('Number of Attendees')
+    plt.xticks(rotation=45, ha="right")
+    plt.legend()
+    plt.tight_layout()
+    st.pyplot(plt)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -516,20 +572,29 @@ if stats_button:
 
 
 
-next_month = datetime.now() + relativedelta(months=1)
+    #start with the graphs:
 
 
-with st.form("this form"):
-    start_time = st.slider(
-        "When do you start?",
-        value=datetime(2024, 6, 1),
-        min_value=datetime(2024,1,1),
-        # max_value=datetime(2025,6,1),
-        # max_value=next_month,
-        format="MM/YY"
-    )
-    push = st.form_submit_button("HERE")
-if push:
-    st.write(start_time)
 
 
+# next_month = datetime.now() + relativedelta(months=1)
+# with st.form("this form"):
+#     start_time = st.slider(
+#         "When do you start?",
+#         value=datetime(2024, 6, 1),
+#         min_value=datetime(2024,1,1),
+#         # max_value=datetime(2025,6,1),
+#         # max_value=next_month,
+#         format="MM/YY"
+#     )
+#     push = st.form_submit_button("HERE")
+# if push:
+#     st.write(start_time)
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+arr = np.random.normal(1, 1, size=100)
+fig, ax = plt.subplots()
+ax.hist(arr, bins=20)
+st.pyplot(fig)
