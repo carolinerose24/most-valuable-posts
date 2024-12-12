@@ -263,6 +263,17 @@ def exclude_people(df, excluded_list):
     return filtered_df
 
 
+def get_member_count(atoken):
+    url = "https://app.circle.so/api/headless/v1/community_members"
+    headers = {"Authorization": atoken}
+    params = {
+        "page":1,
+        "per_page":1
+    }
+    response = requests.get(url, headers=headers, params=params)
+    return response.json().get('count')
+
+
 
 
 
@@ -336,7 +347,7 @@ def plot_posts_per_day(df):
     plt.ylabel('Average Posts per Day', fontsize=14)
     plt.xticks(rotation=45, ha='right')
     for i, v in enumerate(avg_posts_per_day_by_month):
-        plt.text(i, v + 0.05, f'{v:.2f}', ha='center', va='bottom', fontsize=10)
+        plt.text(i, v + 0.05, f'{round(v):.0f}', ha='center', va='bottom', fontsize=10)
     plt.tight_layout()
     st.pyplot(plt)
 
@@ -379,10 +390,10 @@ def plot_likes_comments_per_day(df):
 
     # Annotate the bars with the values
     for i, v in enumerate(avg_likes_per_day_by_month):
-        plt.text(i, v + 0.05, f'{v:.2f}', ha='right', va='bottom', fontsize=9)
+        plt.text(i, v + 0.05, f'{round(v):.0f}', ha='right', va='bottom', fontsize=9)
     
     for i, v in enumerate(avg_comments_per_day_by_month):
-        plt.text(i, v + 0.05, f'{v:.2f}', ha='left', va='bottom', fontsize=9)
+        plt.text(i, v + 0.05, f'{round(v):.0f}', ha='left', va='bottom', fontsize=9)
     
     plt.tight_layout()
     st.pyplot(plt)
@@ -434,7 +445,7 @@ def plot_top_5_likes(df):
     # Generates a bar chart of the top 5 spaces with the highest average likes.
     # """
     # Group by 'Space_Name' and calculate the average of 'Likes'
-    average_likes = df.groupby('Space_Name')['Likes'].mean()
+    average_likes = df.groupby('Space_Name')['Likes'].mean().round()
     
     # Sort by 'Likes' in descending order and take the top 5
     top_5_spaces_likes = average_likes.sort_values(ascending=False).head(5)
@@ -461,7 +472,7 @@ def plot_top_5_comments(df):
     # Generates a bar chart of the top 5 spaces with the highest average comments.
     # """
     # Group by 'Space_Name' and calculate the average of 'Comments'
-    average_comments = df.groupby('Space_Name')['Comments'].mean()
+    average_comments = df.groupby('Space_Name')['Comments'].mean().round()
     
     # Sort by 'Comments' in descending order and take the top 5
     top_5_spaces_comments = average_comments.sort_values(ascending=False).head(5)
@@ -531,11 +542,13 @@ if first_token != "" and email != "":
         st.error('Bad token or email, please try again')
     else:
         st.write(":white_check_mark: Good token and email, now we are ready to pull data from the APIs. Notice that the first time the posts are pulled may take a couple minutes.")
+        member_count = get_member_count(atoken)
 # If the token was bad.......
 else:
     atoken = 0
     members = st.empty()
     event_data = st.empty()
+    member_count = 0
 
 
 
@@ -792,7 +805,7 @@ if stats_button:
         st.write(f"The total number of posts made in this community is {len(posts)} posts.")
         st.write(f"There have been {len(events)} events.")
         st.write(f"The person with the most posts is {highest_poster} with {most_posts_count} posts.")
-        st.write(f"The total number of community members with at least one post is {len(post_counts)}.")
+        st.write(f"The total number of community members with at least one post is {len(post_counts)} our of {member_count} total members, or {len(post_counts)/member_count*100}%.")
         st.write(f"The space with the most posts is \"{biggest_space}\" with {biggest_space_count} posts.")
 
 
