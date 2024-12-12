@@ -805,7 +805,7 @@ if stats_button:
         st.write(f"The total number of posts made in this community is {len(posts)} posts.")
         st.write(f"There have been {len(events)} events.")
         st.write(f"The person with the most posts is {highest_poster} with {most_posts_count} posts.")
-        st.write(f"The total number of community members with at least one post is {len(post_counts)} our of {member_count} total members, or {len(post_counts)/member_count*100}%.")
+        st.write(f"The total number of community members with at least one post is {len(post_counts)} our of {member_count} total members, or {round(len(post_counts)/member_count*100)}%.")
         st.write(f"The space with the most posts is \"{biggest_space}\" with {biggest_space_count} posts.")
 
 
