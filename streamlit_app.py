@@ -253,6 +253,19 @@ def pull_most_valuable_posts(df, top_number, weights, month=0, specific_date='',
     # month == 3 XX other range,,,,,,,
 
 
+
+
+def exclude_people(df, excluded_list):
+    # Split the excluded_list string into a list of names (handle spaces after commas)
+    excluded_names = [name.strip() for name in excluded_list.split(',')]
+    # Filter the DataFrame to exclude authors in the excluded_names list
+    filtered_df = df[~df['Author'].isin(excluded_names)]
+    return filtered_df
+
+
+
+
+
 def plot_events(df):
 
     df['Date'] = pd.to_datetime(events['Date'])
@@ -695,6 +708,11 @@ with st.form("pp_form"):
     filter_mods_check = st.checkbox("Filter out Moderators", value = True)
 
 
+    #FOR FILTERING OUT SPECIFIC PEOPLE:
+    excluded_people = st.text_input("If you want to exclude certain users, you can paste in their exact names here (comma seperated)", "")
+
+
+
     #optional - choose an amount to assign money to
     st.write("Optional When Filtering People:")
     payment_amount = st.number_input(
@@ -711,11 +729,15 @@ with st.form("pp_form"):
             st.toast("Can't pull the posts with a bad token")
         else:
             members = pull_all_posts(atoken)
+            df = members
+            if excluded_people != "":
+                df = exclude_people(members, excluded_people)
+            
             try:
                 if post_or_people_selection == 0: #PEOPLE
-                    st.dataframe(pull_most_valuable_people(members, top_number=picks, weights = weights, month=time_selection, specific_date=opt_date, filter_admins=filter_admins_check, filter_mods=filter_mods_check, amount = payment_amount))
+                    st.dataframe(pull_most_valuable_people(df, top_number=picks, weights = weights, month=time_selection, specific_date=opt_date, filter_admins=filter_admins_check, filter_mods=filter_mods_check, amount = payment_amount))
                 elif post_or_people_selection == 1: #POSTS
-                    st.dataframe(pull_most_valuable_posts(members, top_number=picks, weights = weights, month=time_selection, specific_date=opt_date, filter_admins=filter_admins_check, filter_mods=filter_mods_check))
+                    st.dataframe(pull_most_valuable_posts(df, top_number=picks, weights = weights, month=time_selection, specific_date=opt_date, filter_admins=filter_admins_check, filter_mods=filter_mods_check))
             except ValueError as e:
                 st.error(f"There are not {picks} members that fit these parameters. Please try a smaller number or choose different filters. ")
 
