@@ -129,7 +129,8 @@ def filter_events(df, weights, top_number=5):
         (df['Attendees'] * weights['attendees']) + \
         (df['Length_Minutes'] * weights['duration'])
     df.sort_values(by="Worth", ascending=False, inplace=True)
-    return df[['Event_Title', 'Worth', 'Date', 'Attendees', 'Author', 'Author_Roles']].head(top_number)
+    df.reset_index(inplace=True)
+    return df[['Event_Title', 'Worth', 'Attendees', 'Likes', 'Comments', 'Length_Minutes', 'Date', 'Author', 'Author_Roles']].head(top_number)
 
 
 def pull_most_valuable_people(df, top_number, weights, month=True, specific_date='', 
@@ -161,17 +162,13 @@ def pull_most_valuable_people(df, top_number, weights, month=True, specific_date
         df = df.loc[(df['Date'].dt.year == specific_date.year) & (df['Date'].dt.month == specific_date.month)]
     # elif month == 4: for a different time range?
 
-
-
-
-
     df['post_type_weight'] = df['Post_Type'].map(weights)
     df.loc[:, 'Worth'] = (df['Likes'] * weights['like']) + \
                      (df['Comments'] * weights['comment']) + \
                      (df['post_type_weight'] * 10)
 
-    # user_worth_df = df.groupby('Author', as_index=False).agg({'Worth': 'sum'})
-    user_worth_df = df.groupby(['Author', 'Author_ID'], as_index=False).agg({'Worth': 'sum'})
+    user_worth_df = df.groupby('Author', as_index=False).agg({'Worth': 'sum'})
+    # user_worth_df = df.groupby(['Author', 'Author_ID'], as_index=False).agg({'Worth': 'sum'})
     user_worth_df.sort_values(by='Worth', ascending=False, inplace=True)
 
     #check HERE if there is enough people to return the full number
@@ -256,7 +253,6 @@ def pull_most_valuable_posts(df, top_number, weights, month=0, specific_date='',
     # month == 3 XX other range,,,,,,,
 
 
-
 def plot_events(df):
 
     df['Date'] = pd.to_datetime(events['Date'])
@@ -290,7 +286,7 @@ def plot_events(df):
 
 def plot_post_type(df):
     post_type_counts = df['Post_Type'].value_counts()
-    plt.figure(figsize=(7, 7))
+    plt.figure(figsize=(5, 5))
     plt.pie(post_type_counts, labels=post_type_counts.index, autopct='%1.1f%%', colors=['#D0BA71', '#E8E8E8'], startangle=90)
     plt.title('Distribution of Post Types')
     st.pyplot(plt)
@@ -314,6 +310,147 @@ def plot_posts_per_day(df):
     plt.tight_layout()
     st.pyplot(plt)
 
+
+def plot_likes_comments_per_day(df):
+    # Ensure the Date is in datetime format
+    df['Date'] = pd.to_datetime(df['Date'])
+    df['Year_Month'] = df['Date'].dt.to_period('M')
+    
+    # Calculate total likes and comments per month
+    total_likes_per_month = df.groupby('Year_Month')['Likes'].sum()  # Sum of likes in the month
+    total_comments_per_month = df.groupby('Year_Month')['Comments'].sum()  # Sum of comments in the month
+    
+    # Calculate the number of unique days per month (same as before)
+    posts_per_month_day = df.groupby(df['Year_Month']).apply(lambda x: x['Date'].dt.date.nunique())
+    
+    # Calculate average likes per day
+    avg_likes_per_day_by_month = total_likes_per_month / posts_per_month_day
+    avg_likes_per_day_by_month = avg_likes_per_day_by_month.sort_index()
+    
+    # Calculate average comments per day
+    avg_comments_per_day_by_month = total_comments_per_month / posts_per_month_day
+    avg_comments_per_day_by_month = avg_comments_per_day_by_month.sort_index()
+
+    # Plotting likes and comments side by side
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Plot the bars for likes
+    avg_likes_per_day_by_month.plot(kind='bar', color='#D0BA71', width=0.4, label='Avg Likes Per Day', ax=ax, position=1)
+    
+    # Plot the bars for comments (with adjusted width and position)
+    avg_comments_per_day_by_month.plot(kind='bar', color='#6B8E23', width=0.4, label='Avg Comments Per Day', ax=ax, position=0)
+    
+    # Titles and labels
+    plt.title('Average Likes and Comments Per Day by Month', fontsize=18)
+    plt.xlabel('Month')
+    plt.ylabel('Average Per Day')
+    plt.xticks(rotation=45, ha='right')
+    plt.legend()
+
+    # Annotate the bars with the values
+    for i, v in enumerate(avg_likes_per_day_by_month):
+        plt.text(i, v + 0.05, f'{v:.2f}', ha='right', va='bottom', fontsize=9)
+    
+    for i, v in enumerate(avg_comments_per_day_by_month):
+        plt.text(i, v + 0.05, f'{v:.2f}', ha='left', va='bottom', fontsize=9)
+    
+    plt.tight_layout()
+    st.pyplot(plt)
+
+
+def plot_high_likes_and_comments(df):
+
+
+    # Group by 'Space_Name' and calculate the average of 'Likes' and 'Comments'
+    average_likes_comments = df.groupby('Space_Name')[['Likes', 'Comments']].mean()
+
+    # Sort by 'Comments' in descending order to get the spaces with the highest average comments
+    top_5_spaces_comments = average_likes_comments.sort_values(by='Comments', ascending=False).head(5)
+    top_5_spaces_likes = average_likes_comments.sort_values(by='Likes', ascending=False).head(5)
+
+    # Create the figure and axes for two subplots (side by side)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+    # Plot for Likes
+    top_5_spaces_likes['Likes'].plot(kind='bar', ax=ax1, color='#D0BA71', width=0.8)
+    ax1.set_title('Top 5 Spaces with Highest Average Likes', fontsize=14)
+    ax1.set_xlabel('Space Name', fontsize=12)
+    ax1.set_ylabel('Average Likes', fontsize=12)
+    ax1.set_xticklabels(top_5_spaces_likes.index, rotation=45, ha="right")
+    ax1.legend(['Likes'], loc='upper right')
+    for container in ax1.containers:
+        ax1.bar_label(container, label_type='edge', padding=3, fontsize=10)
+
+    # Plot for Comments
+    top_5_spaces_comments['Comments'].plot(kind='bar', ax=ax2, color='#E8E8E8', width=0.8)
+    ax2.set_title('Top 5 Spaces with Highest Average Comments', fontsize=14)
+    ax2.set_xlabel('Space Name', fontsize=12)
+    ax2.set_ylabel('Average Comments', fontsize=12)
+    ax2.set_xticklabels(top_5_spaces_comments.index, rotation=45, ha="right")
+    ax2.legend(['Comments'], loc='upper right')
+    for container in ax2.containers:
+        ax2.bar_label(container, label_type='edge', padding=3, fontsize=10)
+
+    # Adjust the layout and show the plot
+    plt.tight_layout()
+    st.pyplot(plt)
+
+
+
+
+
+def plot_top_5_likes(df):
+    # """
+    # Generates a bar chart of the top 5 spaces with the highest average likes.
+    # """
+    # Group by 'Space_Name' and calculate the average of 'Likes'
+    average_likes = df.groupby('Space_Name')['Likes'].mean()
+    
+    # Sort by 'Likes' in descending order and take the top 5
+    top_5_spaces_likes = average_likes.sort_values(ascending=False).head(5)
+    
+    # Plot for Likes
+    plt.figure(figsize=(8, 6))
+    bars = top_5_spaces_likes.plot(kind='bar', color='#D0BA71', width=0.8)
+    plt.title('Top 5 Spaces with Highest Average Likes', fontsize=14)
+    plt.xlabel('Space Name', fontsize=12)
+    plt.ylabel('Average Likes', fontsize=12)
+    plt.xticks(rotation=45, ha="right")
+    plt.legend(['Likes'], loc='upper right')
+
+    # Add value labels on the bars
+    for container in bars.containers:
+        bars.bar_label(container, label_type='edge', padding=3, fontsize=10)
+
+    plt.tight_layout()
+    st.pyplot(plt)
+
+
+def plot_top_5_comments(df):
+    # """
+    # Generates a bar chart of the top 5 spaces with the highest average comments.
+    # """
+    # Group by 'Space_Name' and calculate the average of 'Comments'
+    average_comments = df.groupby('Space_Name')['Comments'].mean()
+    
+    # Sort by 'Comments' in descending order and take the top 5
+    top_5_spaces_comments = average_comments.sort_values(ascending=False).head(5)
+    
+    # Plot for Comments
+    plt.figure(figsize=(8, 6))
+    bars = top_5_spaces_comments.plot(kind='bar', color='#E8E8E8', width=0.8)
+    plt.title('Top 5 Spaces with Highest Average Comments', fontsize=14)
+    plt.xlabel('Space Name', fontsize=12)
+    plt.ylabel('Average Comments', fontsize=12)
+    plt.xticks(rotation=45, ha="right")
+    plt.legend(['Comments'], loc='upper right')
+
+    # Add value labels on the bars
+    for container in bars.containers:
+        bars.bar_label(container, label_type='edge', padding=3, fontsize=10)
+
+    plt.tight_layout()
+    st.pyplot(plt)
 
 
 
@@ -342,13 +479,13 @@ This is an app for finding the most valuable posts and people in each community.
 
 ### To Get Your Token:
 To use this app, you need a Circle Headless Token. If you are an admin for a community, you can click on the community name/drop down in the top left corner of the community site. 
-If you navigate to the developer's page and then the token page, you can create a Headless token (not V1 or V2 or Data!!). 
+If you navigate to the developer's page and then the token page, you can create a Headless Auth token (not V1 or V2 or Data!!). 
 You only need to create a Headless token once for each community because you can always use the same token after that.
 Make sure you remember what email/account you were using when you made the token because you will need that email below.
 '''
 
 
-st.link_button("See the Random Picker site for more instructions on generating tokens", "https://gigg-random-picker.streamlit.app/")
+st.link_button("See the Random Picker site for help images on generating tokens", "https://gigg-random-picker.streamlit.app/")
 
 
 # Get the access key and choose People/Posts or Events --------------------------------
@@ -356,17 +493,14 @@ st.link_button("See the Random Picker site for more instructions on generating t
 
 
 # mention that we need to get a new token every hour?????
-first_token = st.text_input("Token here:", "")
-email = st.text_input("Email here:", "")
+first_token = st.text_input("Headless Auth Token Here:", "")
+email = st.text_input("Account Email Here:", "")
 if first_token != "" and email != "":
     atoken = get_access_token(first_token, email)
     if atoken == 1:
         st.error('Bad token or email, please try again')
     else:
         st.write(":white_check_mark: Good token and email, now we are ready to pull data from the APIs. Notice that the first time the posts are pulled may take a couple minutes.")
-        st.write("Because Circle does not allow us to see the hosts/cohosts of livestream events at this time, we cannot assign worth to a person for livestream events the same as we can image or text posts. Consequently, they must be viewed seperately right now.")
-
-
 # If the token was bad.......
 else:
     atoken = 0
@@ -377,7 +511,7 @@ else:
 
 st.divider()
 st.subheader("Quick Buttons:")
-'''Get the top five values in different categories for the community with admins/moderators removed and default weights.
+'''Get the top five values in different categories for the community (excluding admins and moderators) with the following base values:
 - Like = 1
 - Comment = 2
 - Basic Post Type = 1
@@ -385,7 +519,7 @@ st.subheader("Quick Buttons:")
 '''
 
 
-top_five_this_month = st.button("5 most valuable posts this month so far")
+top_five_this_month = st.button("Show the 5 most valuable posts this month so far")
 if top_five_this_month:
     if atoken == 0 or atoken == 1:
             st.toast("Can't pull the posts with a bad token")
@@ -403,7 +537,7 @@ if top_five_this_month:
             st.error(f"There are not 5 members that fit these parameters. Please try a smaller number or choose different filters. ")
 
 
-top_five_all_time = st.button("5 most valuable community members of all time")
+top_five_all_time = st.button("Show the 5 most valuable community members of all time")
 if top_five_all_time:
     if atoken == 0 or atoken == 1:
             st.toast("Can't pull the posts with a bad token")
@@ -421,13 +555,14 @@ if top_five_all_time:
             st.error(f"There are not 5 members that fit these parameters. Please try a smaller number or choose different filters. ")
 
 
-top_five_events = st.button("5 most well attended events of all time")
+top_five_events = st.button("Show the 5 most well attended events of all time")
 if top_five_events:
     if atoken == 0 or atoken == 1:
             st.toast("Can't pull the posts with a bad token")
     else:
         events = pull_all_events(atoken)
         events.sort_values(by="Attendees", ascending=False, inplace=True)
+        events.reset_index(inplace=True)
         st.dataframe(events[['Event_Title', 'Attendees', 'Date', 'Author']].head(5))
 
 
@@ -446,16 +581,25 @@ if top_five_events:
 
 
 st.divider()
-with st.form("e_form"):
-    st.subheader("Filter events data: ")
-    st.write("This section is for finding the most valuable events due to desired parameters.")
-    picks_num = st.slider("How many do you want to pick?", 1, 10, 5)
 
-    st.write("Choose the worth weights:")
-    attendees_weight = st.slider("Attendees Weight", 0, 10, 3)
-    like_weight = st.slider("Like Weight", 0, 10, 1)
-    comment_weight = st.slider("Comment Weight", 0, 10, 2)
-    duration_weight = st.slider("Duration (Minutes) Weight", 0, 10, 2)
+#CHANGE THIS LATER
+# st.write("Because Circle does not allow us to see the hosts/cohosts of livestream events at this time, we cannot directly assign worth to a person for livestream events. the same as we can image or text posts. Consequently, they must be viewed seperately right now.")
+'''
+Because Circle does not allow us to pull the hosts/cohosts of livestream events at this time, we cannot directly assign worth to a person for livestream events. We can only see the person who created the livestream event, not the people that talked/presenting during it or for how long.
+Consequently, event data cannot be valued the same as text or image posts.
+'''
+
+
+with st.form("e_form"):
+    st.subheader("Filter livestream events data: ")
+    st.write("This section is for finding the most valuable events due to desired parameters.")
+    
+
+    st.write("On a scale of 0-10, how valuable is each metric to you? A higher slider values means it will more greatly influence the final worth value of the event. If you want all the metrics to be equally important, set the sliders to the same values.")
+    attendees_weight = st.slider("Number of Attendees", 0, 10, 3)
+    like_weight = st.slider("Likes", 0, 10, 1)
+    comment_weight = st.slider("Comments", 0, 10, 2)
+    duration_weight = st.slider("Event Duration", 0, 10, 2)
 
     weights = {
         'like': like_weight,
@@ -463,6 +607,9 @@ with st.form("e_form"):
         'attendees': attendees_weight,
         'duration': duration_weight
     }
+
+
+    picks_num = st.slider("How many events do you want to show?", 1, 10, 5)
     e_submit = st.form_submit_button('Submit my picks')
     if e_submit:
 
@@ -471,10 +618,16 @@ with st.form("e_form"):
             st.toast("Can't pull the posts with a bad token")
         else:
             events = pull_all_events(atoken)
-            try:
+            if picks_num > len(events):
+                st.toast(f"This community only has {len(events)} events.")
+                st.dataframe(filter_events(events, weights, len(events)))
+            else:
                 st.dataframe(filter_events(events, weights, picks_num))
-            except ValueError as e:
-                st.error(f"There may not be {picks_num} events that fit these parameters. Please try again with less events.")
+            # try:
+            #     st.dataframe(filter_events(events, weights, picks_num))
+            # except ValueError as e:
+            #     st.toast(f"This community only has {len(events)} events.")
+            #     st.dataframe(filter_events(events, weights, len(events)))
 
 
 
@@ -546,7 +699,7 @@ with st.form("pp_form"):
     st.write("Optional When Filtering People:")
     payment_amount = st.number_input(
         label = "Input a dollar amount to see the distribution between top members", 
-        min_value=0, max_value=10000, value="min"
+        min_value=0, max_value=1000000, value="min"
     )
     
     
@@ -569,10 +722,10 @@ with st.form("pp_form"):
 
 
 st.divider()
-"""Possible Future features (depending on if circle ever gets back to us):
-- Events where we know the names of who hosted/cohosted (not available anywhere)
+"""What I would like to eventually add: (depending on if circle ever gets back to us):
+- Events where we know the names of who hosted/cohosted (not available anywhere right now)
 - Filter by activity score (not available in headless)
-- Input tokens from multiple communities at a time
+- Input tokens from multiple communities at a time to compare their data
 """
 
 
@@ -608,6 +761,11 @@ if stats_button:
         plot_events(events)
         plot_post_type(posts)
         plot_posts_per_day(posts)
+        plot_likes_comments_per_day(posts)
+        plot_top_5_likes(posts)
+        plot_top_5_comments(posts)
+        
+
         
 
 
