@@ -297,12 +297,29 @@ def plot_events(df):
     st.pyplot(plt)
 
 
+# def plot_post_type(df):
+#     post_type_counts = df['Post_Type'].value_counts()
+#     plt.figure(figsize=(4, 4))
+#     plt.pie(post_type_counts, labels=post_type_counts.index, autopct='%1.1f%%', colors=['#D0BA71', '#E8E8E8'], startangle=90)
+#     plt.title('Distribution of Post Types')
+#     st.pyplot(plt)
+
 def plot_post_type(df):
+    # Count the occurrences of each post type
     post_type_counts = df['Post_Type'].value_counts()
-    plt.figure(figsize=(5, 5))
-    plt.pie(post_type_counts, labels=post_type_counts.index, autopct='%1.1f%%', colors=['#D0BA71', '#E8E8E8'], startangle=90)
+    
+    # Create a mapping for labels
+    label_mapping = {'basic': 'Text', 'image': 'Image'}
+    
+    # Map the labels
+    mapped_labels = [label_mapping.get(label, label) for label in post_type_counts.index]
+    
+    # Plot the pie chart
+    plt.figure(figsize=(4, 4))
+    plt.pie(post_type_counts, labels=mapped_labels, autopct='%1.1f%%', colors=['#D0BA71', '#E8E8E8'], startangle=180)
     plt.title('Distribution of Post Types')
     st.pyplot(plt)
+
 
 
 def plot_posts_per_day(df):
@@ -315,11 +332,11 @@ def plot_posts_per_day(df):
     plt.figure(figsize=(10, 6))
     avg_posts_per_day_by_month.plot(kind='bar', color='#D0BA71')
     plt.title('Average Number of Posts Per Day by Month', fontsize=18)
-    plt.xlabel('Month')
-    plt.ylabel('Average Posts per Day')
+    plt.xlabel('Month', fontsize=12)
+    plt.ylabel('Average Posts per Day', fontsize=12)
     plt.xticks(rotation=45, ha='right')
     for i, v in enumerate(avg_posts_per_day_by_month):
-        plt.text(i, v + 0.05, f'{v:.2f}', ha='center', va='bottom', fontsize=9)
+        plt.text(i, v + 0.05, f'{v:.2f}', ha='center', va='bottom', fontsize=10)
     plt.tight_layout()
     st.pyplot(plt)
 
@@ -351,14 +368,14 @@ def plot_likes_comments_per_day(df):
     avg_likes_per_day_by_month.plot(kind='bar', color='#D0BA71', width=0.4, label='Avg Likes Per Day', ax=ax, position=1)
     
     # Plot the bars for comments (with adjusted width and position)
-    avg_comments_per_day_by_month.plot(kind='bar', color='#6B8E23', width=0.4, label='Avg Comments Per Day', ax=ax, position=0)
+    avg_comments_per_day_by_month.plot(kind='bar', color='#E8E8E8', width=0.4, label='Avg Comments Per Day', ax=ax, position=0)
     
     # Titles and labels
     plt.title('Average Likes and Comments Per Day by Month', fontsize=18)
-    plt.xlabel('Month')
-    plt.ylabel('Average Per Day')
+    plt.xlabel('Month', fontsize=12)
+    plt.ylabel('Average Per Day', fontsize=12)
     plt.xticks(rotation=45, ha='right')
-    plt.legend()
+    plt.legend(fontsize=14)
 
     # Annotate the bars with the values
     for i, v in enumerate(avg_likes_per_day_by_month):
@@ -451,7 +468,7 @@ def plot_top_5_comments(df):
     
     # Plot for Comments
     plt.figure(figsize=(8, 6))
-    bars = top_5_spaces_comments.plot(kind='bar', color='#E8E8E8', width=0.8)
+    bars = top_5_spaces_comments.plot(kind='bar', color='#D0BA71', width=0.8)
     plt.title('Top 5 Spaces with Highest Average Comments', fontsize=14)
     plt.xlabel('Space Name', fontsize=12)
     plt.ylabel('Average Comments', fontsize=12)
@@ -781,10 +798,15 @@ if stats_button:
 
 
         plot_events(events)
+        st.divider()
         plot_post_type(posts)
+        st.divider()
         plot_posts_per_day(posts)
+        st.divider()
         plot_likes_comments_per_day(posts)
+        st.divider()
         plot_top_5_likes(posts)
+        st.divider()
         plot_top_5_comments(posts)
         
 
