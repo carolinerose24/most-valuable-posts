@@ -254,27 +254,6 @@ def pull_most_valuable_posts(df, top_number, weights, month=0, specific_date='',
 
 
 
-
-# def exclude_people(df, excluded_list, exclude=True):
-#     # Split the excluded_list string into a list of names (handle spaces after commas)
-#     # excluded_names = [name.strip() for name in excluded_list.split(',')]
-#     excluded_names = [name.strip() for name in excluded_list.split(',') if name.strip()]
-
-#     # Filter the DataFrame to exclude authors in the excluded_names list
-
-#      # Check for names in excluded_names that are not in the DataFrame
-#     invalid_names = [name for name in excluded_names if name not in df['Author'].unique()]
-    
-#     # Create an alert for invalid names
-#     if invalid_names:
-#         st.toast(f"Invalid name(s): {', '.join(invalid_names)}")
-
-#     if exclude:
-#         return df[~df['Author'].isin(excluded_names)]
-#     else:
-#         return df[df['Author'].isin(excluded_names)]
-
-
 def exclude_people(df, excluded_list, exclude=True):
     # Split the excluded_list string into a list of names (handle spaces and remove empty names)
     excluded_names = [name.strip().lower() for name in excluded_list.split(',') if name.strip()]
@@ -301,8 +280,6 @@ def exclude_people(df, excluded_list, exclude=True):
     return filtered_df
 
         
-
-
 def get_member_count(atoken):
     url = "https://app.circle.so/api/headless/v1/community_members"
     headers = {"Authorization": atoken}
@@ -312,9 +289,6 @@ def get_member_count(atoken):
     }
     response = requests.get(url, headers=headers, params=params)
     return response.json().get('count')
-
-
-
 
 
 def plot_events(df):
@@ -347,14 +321,6 @@ def plot_events(df):
     plt.tight_layout()
     st.pyplot(plt)
 
-
-# def plot_post_type(df):
-#     post_type_counts = df['Post_Type'].value_counts()
-#     plt.figure(figsize=(4, 4))
-#     plt.pie(post_type_counts, labels=post_type_counts.index, autopct='%1.1f%%', colors=['#D0BA71', '#E8E8E8'], startangle=90)
-#     plt.title('Distribution of Post Types')
-#     st.pyplot(plt)
-
 def plot_post_type(df):
     # Count the occurrences of each post type
     post_type_counts = df['Post_Type'].value_counts()
@@ -370,8 +336,6 @@ def plot_post_type(df):
     plt.pie(post_type_counts, labels=mapped_labels, autopct='%1.1f%%', colors=['#D0BA71', '#E8E8E8'], startangle=180)
     plt.title('Distribution of Post Types')
     st.pyplot(plt)
-
-
 
 def plot_posts_per_day(df):
     df['Date'] = pd.to_datetime(df['Date'])
@@ -390,7 +354,6 @@ def plot_posts_per_day(df):
         plt.text(i, v + 0.05, f'{round(v):.0f}', ha='center', va='bottom', fontsize=10)
     plt.tight_layout()
     st.pyplot(plt)
-
 
 def plot_likes_comments_per_day(df):
     # Ensure the Date is in datetime format
@@ -439,46 +402,6 @@ def plot_likes_comments_per_day(df):
     st.pyplot(plt)
 
 
-# def plot_high_likes_and_comments(df):
-
-
-#     # Group by 'Space_Name' and calculate the average of 'Likes' and 'Comments'
-#     average_likes_comments = df.groupby('Space_Name')[['Likes', 'Comments']].mean()
-
-#     # Sort by 'Comments' in descending order to get the spaces with the highest average comments
-#     top_5_spaces_comments = average_likes_comments.sort_values(by='Comments', ascending=False).head(5)
-#     top_5_spaces_likes = average_likes_comments.sort_values(by='Likes', ascending=False).head(5)
-
-#     # Create the figure and axes for two subplots (side by side)
-#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-
-#     # Plot for Likes
-#     top_5_spaces_likes['Likes'].plot(kind='bar', ax=ax1, color='#D0BA71', width=0.8)
-#     ax1.set_title('Top 5 Spaces with Highest Average Likes', fontsize=14)
-#     ax1.set_xlabel('Space Name', fontsize=12)
-#     ax1.set_ylabel('Average Likes', fontsize=12)
-#     ax1.set_xticklabels(top_5_spaces_likes.index, rotation=45, ha="right")
-#     ax1.legend(['Likes'], loc='upper right')
-#     for container in ax1.containers:
-#         ax1.bar_label(container, label_type='edge', padding=3, fontsize=10)
-
-#     # Plot for Comments
-#     top_5_spaces_comments['Comments'].plot(kind='bar', ax=ax2, color='#E8E8E8', width=0.8)
-#     ax2.set_title('Top 5 Spaces with Highest Average Comments', fontsize=14)
-#     ax2.set_xlabel('Space Name', fontsize=12)
-#     ax2.set_ylabel('Average Comments', fontsize=12)
-#     ax2.set_xticklabels(top_5_spaces_comments.index, rotation=45, ha="right")
-#     ax2.legend(['Comments'], loc='upper right')
-#     for container in ax2.containers:
-#         ax2.bar_label(container, label_type='edge', padding=3, fontsize=10)
-
-#     # Adjust the layout and show the plot
-#     plt.tight_layout()
-#     st.pyplot(plt)
-
-
-
-
 
 def plot_top_5_likes(df):
     # """
@@ -500,8 +423,11 @@ def plot_top_5_likes(df):
     plt.legend(['Likes'], loc='upper right')
 
     # Add value labels on the bars
-    for container in bars.containers:
-        bars.bar_label(container, label_type='edge', padding=3, fontsize=10)
+    # for container in bars.containers:
+    #     bars.bar_label(container, label_type='edge', padding=3, fontsize=10)
+        # Add value labels on the bars
+    for i, v in enumerate(top_5_spaces_likes):
+        plt.text(i, v + 0.5, str(int(v)), ha='center', va='bottom', fontsize=10)
 
     plt.tight_layout()
     st.pyplot(plt)
@@ -527,8 +453,12 @@ def plot_top_5_comments(df):
     plt.legend(['Comments'], loc='upper right')
 
     # Add value labels on the bars
-    for container in bars.containers:
-        bars.bar_label(container, label_type='edge', padding=3, fontsize=10)
+    # for container in bars.containers:
+    #     bars.bar_label(container, label_type='edge', padding=3, fontsize=10)
+
+     # Add value labels on the bars
+    for i, v in enumerate(top_5_spaces_comments):
+        plt.text(i, v + 0.5, str(int(v)), ha='center', va='bottom', fontsize=10)
 
     plt.tight_layout()
     st.pyplot(plt)
@@ -644,17 +574,19 @@ if top_five_events:
 
 
 
+all_events = st.button("Show all events (up to 100)")
+if all_events:
+    if atoken == 0 or atoken == 1:
+            st.toast("Can't pull the posts with a bad token")
+    else:
+        events = pull_all_events(atoken)
+        events.sort_values(by="Date", ascending=False, inplace=True)
+        events.reset_index(inplace=True)
+        if len(events) > 100:
+            st.dataframe(events[['Event_Title', 'Attendees', 'Date', 'Author']].head(100))
+        else:
+            st.dataframe(events[['Event_Title', 'Attendees', 'Date', 'Author']])
 
-
-
-# # make this a form?? with weights too????
-# event_button = st.button("Pull and Display Event Data:")
-# if event_button:
-#     if atoken == 0 or atoken == 1:
-#         st.toast("Can't pull events with a bad token")
-#     else:
-#         event_data = pull_all_events(atoken)
-#         st.dataframe(event_data)
 
 
 st.divider()
@@ -748,7 +680,7 @@ with st.form("e_form"):
     }
 
 
-    picks_num = st.slider("How many events do you want to show?", 1, 10, 5)
+    picks_num = st.slider("How many events do you want to show?", 1, 25, 5)
     e_submit = st.form_submit_button('Submit my picks')
     if e_submit:
 
@@ -886,28 +818,47 @@ st.divider()
 stats_button = st.button("Generate some statisitics/graphs about this data: ")
 if stats_button:
     if atoken == 0 or atoken == 1:
-            st.toast("Can't pull the posts with a bad token")
+            st.toast("Can't pull the posts/events with a bad token")
     else:
+
+        #about events
+        events = pull_all_events(atoken)
+        if len(events) > 0:
+            avg_attendees = round(events['Attendees'].mean())
+            max_attendees_row = events.loc[events['Attendees'].idxmax()]
+            biggest_event = max_attendees_row['Event_Title']
+            biggest_event_count = max_attendees_row['Attendees']
+
+            st.subheader("Event Statistics:")
+            st.write(f"There have been {len(events)} livestream events.")
+            st.write(f"The average number of livestream attendees is {avg_attendees}.")
+            st.write(f"The event with the highest attendance was \"{biggest_event}\" with {biggest_event_count} attendees.")
+
+            st.write("Here are the months and counts for when livestream events occurred.")
+            events['Date'] = pd.to_datetime(events['Date'])
+            events['YearMonth'] = events['Date'].dt.to_period('M')
+            events_per_month = events.groupby('YearMonth').size()
+            events_per_month_df = events_per_month.reset_index(name='Event_Count')
+            st.dataframe(events_per_month_df)
+            plot_events(events)
+            st.divider()
+
+
         posts = pull_all_posts(atoken)
+        st.subheader("Post Statistics:")
         post_counts = posts['Author'].value_counts()
         highest_poster = post_counts.index[0]
         most_posts_count = post_counts.iloc[0]
-
         space_counts = posts['Space_Name'].value_counts()
         biggest_space = space_counts.index[0]
         biggest_space_count = space_counts.iloc[0]
 
-        events = pull_all_events(atoken)
         st.write(f"The total number of posts made in this community is {len(posts)} posts.")
-        st.write(f"There have been {len(events)} events.")
         st.write(f"The person with the most posts is {highest_poster} with {most_posts_count} posts.")
-        st.write(f"The total number of community members with at least one post is {len(post_counts)} our of {member_count} total members, or {round(len(post_counts)/member_count*100)}%.")
-        st.write(f"The space with the most posts is \"{biggest_space}\" with {biggest_space_count} posts.")
-
-
-
-        plot_events(events)
+        st.write(f"The total number of community members with at least one post is {len(post_counts)} of our {member_count} total members, or about {round(len(post_counts)/member_count*100)}%.")
+        st.write(f"The space with the most posts is \"{biggest_space}\" with {biggest_space_count} posts, about {round(biggest_space_count/len(posts)*100)}% of all total posts.")
         st.divider()
+
         plot_post_type(posts)
         st.divider()
         plot_posts_per_day(posts)
