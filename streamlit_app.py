@@ -34,7 +34,7 @@ def get_space_ids(access_token):
     df = pd.json_normalize(data)
     return df[['id', 'name', 'space_type']]
 
-@st.cache_data(ttl='1h')
+@st.cache_data(ttl='1d')
 def pull_all_posts(access_token):
     space_id_df = get_space_ids(access_token)
     master_list = pd.DataFrame(columns=['post_type', 'space_type', 'display_title', 'comment_count', 
@@ -84,7 +84,7 @@ def pull_all_posts(access_token):
     master_list['Author_ID'] = master_list['Author_ID'].astype('Int64')
     return master_list[['Title', 'Author', 'Date', 'Likes', 'Comments', 'Post_Type', 'Space_Name', 'Author_Roles', 'Author_ID', 'Post_ID']]
 
-@st.cache_data(ttl='1h')
+@st.cache_data(ttl='1d')
 def pull_all_events(access_token):
     url = "https://app.circle.so/api/headless/v1/community_events?per_page=100&past_events=True"
     headers = {'Authorization': access_token}
@@ -255,12 +255,52 @@ def pull_most_valuable_posts(df, top_number, weights, month=0, specific_date='',
 
 
 
-def exclude_people(df, excluded_list):
-    # Split the excluded_list string into a list of names (handle spaces after commas)
-    excluded_names = [name.strip() for name in excluded_list.split(',')]
-    # Filter the DataFrame to exclude authors in the excluded_names list
-    filtered_df = df[~df['Author'].isin(excluded_names)]
+# def exclude_people(df, excluded_list, exclude=True):
+#     # Split the excluded_list string into a list of names (handle spaces after commas)
+#     # excluded_names = [name.strip() for name in excluded_list.split(',')]
+#     excluded_names = [name.strip() for name in excluded_list.split(',') if name.strip()]
+
+#     # Filter the DataFrame to exclude authors in the excluded_names list
+
+#      # Check for names in excluded_names that are not in the DataFrame
+#     invalid_names = [name for name in excluded_names if name not in df['Author'].unique()]
+    
+#     # Create an alert for invalid names
+#     if invalid_names:
+#         st.toast(f"Invalid name(s): {', '.join(invalid_names)}")
+
+#     if exclude:
+#         return df[~df['Author'].isin(excluded_names)]
+#     else:
+#         return df[df['Author'].isin(excluded_names)]
+
+
+def exclude_people(df, excluded_list, exclude=True):
+    # Split the excluded_list string into a list of names (handle spaces and remove empty names)
+    excluded_names = [name.strip().lower() for name in excluded_list.split(',') if name.strip()]
+    
+    # Normalize the 'Author' column to lowercase for comparison
+    df['Author_normalized'] = df['Author'].str.lower()
+    
+    # Check for names in excluded_names that are not in the DataFrame
+    invalid_names = [name for name in excluded_names if name not in df['Author_normalized'].unique()]
+    
+    # Create an alert for invalid names
+    if invalid_names:
+        st.toast(f"Invalid name(s): {', '.join(invalid_names)}")
+
+    # Filter the DataFrame based on exclude flag
+    if exclude:
+        filtered_df = df[~df['Author_normalized'].isin(excluded_names)]
+    else:
+        filtered_df = df[df['Author_normalized'].isin(excluded_names)]
+    
+    # Drop the temporary normalized column before returning
+    filtered_df = filtered_df.drop(columns=['Author_normalized'])
+    
     return filtered_df
+
+        
 
 
 def get_member_count(atoken):
@@ -498,7 +538,12 @@ def plot_top_5_comments(df):
 
 
 
-
+default_weights = {
+                'like': 1,
+                'comment': 2,
+                'basic': 1,
+                'image': 2
+            }
 
 
 
@@ -542,6 +587,7 @@ if first_token != "" and email != "":
         st.error('Bad token or email, please try again')
     else:
         st.write(":white_check_mark: Good token and email, now we are ready to pull data from the APIs. Notice that the first time the posts are pulled may take a couple minutes.")
+        st.write(":red[You can download any data table as a CSV by hovering over it and clicking the button that appears in the top right corner.]")
         member_count = get_member_count(atoken)
 # If the token was bad.......
 else:
@@ -569,13 +615,7 @@ if top_five_this_month:
     else:
         members = pull_all_posts(atoken)
         try:
-            weights = {
-                'like': 1,
-                'comment': 2,
-                'basic': 1,
-                'image': 2
-            }
-            st.dataframe(pull_most_valuable_posts(members, top_number=5, weights = weights, month=1, filter_admins=True, filter_mods=True))
+            st.dataframe(pull_most_valuable_posts(members, top_number=5, weights = default_weights, month=1, filter_admins=True, filter_mods=True))
         except ValueError as e:
             st.error(f"There are not 5 members that fit these parameters. Please try a smaller number or choose different filters. ")
 
@@ -587,13 +627,7 @@ if top_five_all_time:
     else:
         members = pull_all_posts(atoken)
         try:
-            weights = {
-                'like': 1,
-                'comment': 2,
-                'basic': 1,
-                'image': 2
-            }
-            st.dataframe(pull_most_valuable_people(members, top_number=5, weights = weights, month=0, filter_admins=True, filter_mods=True))
+            st.dataframe(pull_most_valuable_people(members, top_number=5, weights = default_weights, month=0, filter_admins=True, filter_mods=True))
         except ValueError as e:
             st.error(f"There are not 5 members that fit these parameters. Please try a smaller number or choose different filters. ")
 
@@ -624,6 +658,68 @@ if top_five_events:
 
 
 st.divider()
+
+# section for inputting names and then filtering to JUST THEIR WORTH in a table
+# form for submitting the names, shows a df underneath
+# again say how to download this -- and a place for inputting a number value
+
+
+
+with st.form('search_form'):
+    st.subheader("Show value of specific community members by name:")
+    st.write("This section is where you can search names of members to show their individual worth and a payment amount.")
+    included_people = st.text_input("Input exact names here (comma seperated)", "")
+
+    payment_amount_first = st.number_input(
+        label = "Input a dollar amount to see the distribution between chosen members", 
+        min_value=0, max_value=1000000, value="min"
+    )
+
+    s_submit = st.form_submit_button('Show their value')
+    if s_submit:
+        if atoken == 0 or atoken == 1:
+            st.toast("Can't do this with a bad token")
+        else:
+            members = pull_all_posts(atoken)
+            df = exclude_people(members, included_people, exclude=False)
+
+            #now check if there are all the people in the list?
+            pick_count = df['Author'].nunique()
+            if pick_count < 1 or len(df) == 0:
+                st.toast("There were no valid names, please make sure to spell names exactly.")
+            else:
+                st.dataframe(pull_most_valuable_people(df, pick_count,
+                                                    weights = default_weights, month=0, specific_date=" ",
+                                                    filter_admins=False, filter_mods=False, amount = payment_amount_first))
+                st.write("You can download this table as a CSV using the button in the top right corner of the table when you hover over it.")
+
+
+            
+            # try:
+            #     if post_or_people_selection == 0: #PEOPLE
+            #         st.dataframe(pull_most_valuable_people(df, top_number=picks, weights = weights, month=time_selection, specific_date=opt_date, filter_admins=filter_admins_check, filter_mods=filter_mods_check, amount = payment_amount))
+            #     elif post_or_people_selection == 1: #POSTS
+            #         st.dataframe(pull_most_valuable_posts(df, top_number=picks, weights = weights, month=time_selection, specific_date=opt_date, filter_admins=filter_admins_check, filter_mods=filter_mods_check))
+            # except ValueError as e:
+            #     st.error(f"There are not {picks} members that fit these parameters. Please try a smaller number or choose different filters. ")
+
+
+
+#if there isn't a match for a person, maybe send out a TOAST message about it???
+
+
+
+
+
+
+
+
+
+
+
+
+st.divider()
+
 
 #CHANGE THIS LATER
 # st.write("Because Circle does not allow us to see the hosts/cohosts of livestream events at this time, we cannot directly assign worth to a person for livestream events. the same as we can image or text posts. Consequently, they must be viewed seperately right now.")
